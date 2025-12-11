@@ -30,7 +30,8 @@ class EmailVerificationService
         // Generate new verification token
         $verification = $this->verificationRepository->create([
             'user_id' => $user->id,
-            'token' => Str::random(64),
+            'code' => EmailVerification::generateCode(),
+
             'expires_at' => Carbon::now()->addHours(24), // Valid for 24 hours
         ]);
 
@@ -46,7 +47,8 @@ class EmailVerificationService
     public function verifyEmail(string $token): User
     {
         // Find verification token
-        $verification = $this->verificationRepository->findByToken($token);
+        $verification = $this->verificationRepository->findByCode($token);
+
 
         if (!$verification) {
             throw ValidationException::withMessages([

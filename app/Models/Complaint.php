@@ -20,10 +20,7 @@ class Complaint extends Model
         'complaint_kind',
         'description',
         'location',
-        'latitude',
-        'longitude',
         'status',
-        'priority',
         'assigned_to',
         'locked_at',
         'lock_expires_at',
@@ -49,7 +46,7 @@ class Complaint extends Model
         'deleted_at' => 'datetime',
     ];
 
-    // Relationships remain the same...
+    // Relationships
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -97,7 +94,6 @@ class Complaint extends Model
             return false;
         }
 
-        // Check if lock has expired
         if ($this->lock_expires_at && $this->lock_expires_at->isPast()) {
             return false;
         }

@@ -17,8 +17,6 @@ class UpdateComplaintRequest extends FormRequest
             'complaint_kind' => ['sometimes', 'string', 'max:255'],
             'description' => ['sometimes', 'string', 'min:20'],
             'location' => ['sometimes', 'string', 'max:500'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,gif', 'max:5120'],
             'pdfs' => ['nullable', 'array', 'max:5'],

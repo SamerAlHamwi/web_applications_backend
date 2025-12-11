@@ -8,7 +8,6 @@ class CreateComplaintRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Only citizens can create complaints
         return auth()->check() && auth()->user()->role === 'citizen';
     }
 
@@ -19,9 +18,6 @@ class CreateComplaintRequest extends FormRequest
             'complaint_kind' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'min:20'],
             'location' => ['required', 'string', 'max:500'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'priority' => ['nullable', 'in:low,medium,high'],
             'images' => ['nullable', 'array', 'max:5'],
             'images.*' => ['image', 'mimes:jpeg,png,jpg,gif', 'max:5120'], // 5MB max
             'pdfs' => ['nullable', 'array', 'max:5'],

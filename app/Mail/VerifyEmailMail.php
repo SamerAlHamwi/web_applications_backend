@@ -3,8 +3,7 @@
 
 namespace App\Mail;
 
-use App\Models\User;
-use App\Models\EmailVerification;
+use App\Models\PendingRegistration;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -16,8 +15,7 @@ class VerifyEmailMail extends Mailable
     use Queueable, SerializesModels;
 
     public function __construct(
-        public User $user,
-        public EmailVerification $verification
+        public PendingRegistration $pendingRegistration
     ) {}
 
     public function envelope(): Envelope
@@ -29,12 +27,11 @@ class VerifyEmailMail extends Mailable
 
     public function content(): Content
     {
-        // Use text instead of view - no Blade template needed!
         return new Content(
             text: 'emails.verify-email-text',
             with: [
-                'userName' => $this->user->full_name,
-                'code' => $this->verification->code,
+                'userName' => $this->pendingRegistration->full_name,
+                'code' => $this->pendingRegistration->code,
                 'expiresInMinutes' => config('auth.verification.expire', 60),
             ],
         );

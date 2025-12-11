@@ -170,10 +170,7 @@ class ComplaintController extends Controller
             'complaint_kind' => $complaint->complaint_kind,
             'description' => $complaint->description,
             'location' => $complaint->location,
-            'latitude' => $complaint->latitude,
-            'longitude' => $complaint->longitude,
             'status' => $complaint->status,
-            'priority' => $complaint->priority,
             'info_requested' => $complaint->info_requested,
             'info_request_message' => $complaint->info_request_message,
             'is_locked' => $complaint->isLocked(),
@@ -214,7 +211,6 @@ class ComplaintController extends Controller
             'tracking_number' => $complaint->tracking_number,
             'complaint_kind' => $complaint->complaint_kind,
             'status' => $complaint->status,
-            'priority' => $complaint->priority,
             'info_requested' => $complaint->info_requested,
             'entity' => [
                 'name' => $complaint->entity->name,

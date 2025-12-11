@@ -11,6 +11,7 @@ use Illuminate\Support\ServiceProvider;
 use App\Repositories\UserRepository;
 use App\Repositories\RefreshTokenRepository;
 use App\Repositories\EmailVerificationRepository;
+use App\Repositories\PendingRegistrationRepository; // ADDED
 use App\Repositories\EntityRepository;
 use App\Repositories\EmployeeRepository;
 use App\Repositories\ComplaintRepository;
@@ -38,19 +39,22 @@ class AppServiceProvider extends ServiceProvider
         // ============================================
         // REGISTER REPOSITORIES
         // ============================================
+
         $this->app->singleton(UserRepository::class, function ($app) {
             return new UserRepository();
         });
-        $this->app->singleton(FcmService::class, function ($app) {
-            return new FcmService();
 
-        });
         $this->app->singleton(RefreshTokenRepository::class, function ($app) {
             return new RefreshTokenRepository();
         });
 
         $this->app->singleton(EmailVerificationRepository::class, function ($app) {
             return new EmailVerificationRepository();
+        });
+
+        // ADDED: Pending Registration Repository
+        $this->app->singleton(PendingRegistrationRepository::class, function ($app) {
+            return new PendingRegistrationRepository();
         });
 
         $this->app->singleton(EntityRepository::class, function ($app) {
@@ -72,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
         // ============================================
         // REGISTER UTILITIES
         // ============================================
+
         $this->app->singleton(TrackingNumber::class, function ($app) {
             return new TrackingNumber();
         });
@@ -80,11 +85,15 @@ class AppServiceProvider extends ServiceProvider
             return new FileUploadService();
         });
 
+        $this->app->singleton(FcmService::class, function ($app) {
+            return new FcmService();
+        });
+
         // ============================================
         // REGISTER SERVICES
         // ============================================
 
-        // Email Verification Service
+        // Email Verification Service (still used for legacy flows if needed)
         $this->app->singleton(EmailVerificationService::class, function ($app) {
             return new EmailVerificationService(
                 $app->make(EmailVerificationRepository::class),
@@ -93,11 +102,12 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // Auth Service (for citizens/companies)
+        // UPDATED: Now uses PendingRegistrationRepository
         $this->app->singleton(AuthService::class, function ($app) {
             return new AuthService(
                 $app->make(UserRepository::class),
                 $app->make(RefreshTokenRepository::class),
-                $app->make(EmailVerificationRepository::class)
+                $app->make(PendingRegistrationRepository::class) // CHANGED
             );
         });
 

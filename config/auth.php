@@ -12,7 +12,9 @@ return [
     | as required, but they're a perfect start for most applications.
     |
     */
-
+    'verification' => [
+        'expire' => 60, // minutes (1 hour)
+    ],
     // config/auth.php
     'defaults' => [
         'guard' => 'api',

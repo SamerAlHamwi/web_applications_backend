@@ -19,7 +19,7 @@ use App\Http\Controllers\Admin\EntityController;
 // ============================================
 
 Route::prefix('auth')->group(function () {
-    // Registration - 3 per hour per IP
+    // Registration - 10 per hour per IP, 3 per hour per email
     Route::post('/register', [RegisterController::class, 'register'])
         ->middleware('throttle:register');
 
@@ -31,11 +31,12 @@ Route::prefix('auth')->group(function () {
     Route::post('/refresh', [RefreshTokenController::class, 'refresh'])
         ->middleware('throttle:api');
 
-    // Email verification - 2 per minute
-    Route::get('/verify-email/{token}', [VerifyEmailController::class, 'verify'])
+    // ✅ Email verification - POST with email and code in body
+    Route::post('/verify-email', [VerifyEmailController::class, 'verify'])
         ->middleware('throttle:email-verification');
 
-    Route::post('/resend-verification', [VerifyEmailController::class, 'resend'])
+    // ✅ Resend verification code - POST with email in body
+    Route::post('/resend-email-code', [VerifyEmailController::class, 'resend'])
         ->middleware('throttle:email-verification');
 });
 
@@ -58,7 +59,7 @@ Route::middleware(['auth:api', 'throttle:fcm-register'])->prefix('fcm')->group(f
 // CITIZEN COMPLAINT ROUTES
 // ============================================
 Route::middleware('auth:api')->prefix('complaints')->group(function () {
-    // Create complaint - 5 per hour, 20 per day
+    // Create complaint - 10 per hour, 30 per day
     Route::post('/', [ComplaintController::class, 'store'])
         ->middleware('throttle:create-complaint');
 
@@ -70,7 +71,7 @@ Route::middleware('auth:api')->prefix('complaints')->group(function () {
     Route::get('/track/{trackingNumber}', [ComplaintController::class, 'track'])
         ->middleware('throttle:public-track');
 
-    // Update complaint - 10 per minute
+    // Update complaint - 15 per minute
     Route::post('/{trackingNumber}/update', [ComplaintController::class, 'update'])
         ->middleware('throttle:update-complaint');
 
@@ -136,6 +137,7 @@ Route::prefix('admin')->middleware(['auth:api', 'admin', 'throttle:admin-api'])-
     Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
     Route::get('/auth/me', [AdminAuthController::class, 'me']);
     Route::get('/rate-limits/statistics', [RateLimitController::class, 'statistics']);
+
     // Entity Management
     Route::prefix('entities')->group(function () {
         Route::get('/', [EntityController::class, 'index']);
@@ -145,7 +147,6 @@ Route::prefix('admin')->middleware(['auth:api', 'admin', 'throttle:admin-api'])-
         Route::delete('/{id}', [EntityController::class, 'destroy']);
         Route::patch('/{id}/toggle-status', [EntityController::class, 'toggleStatus']);
         Route::get('/{entityId}/employees', [EmployeeController::class, 'getByEntity']);
-
     });
 
     // Employee Management
@@ -157,4 +158,17 @@ Route::prefix('admin')->middleware(['auth:api', 'admin', 'throttle:admin-api'])-
         Route::delete('/{id}', [EmployeeController::class, 'destroy']);
         Route::patch('/{id}/toggle-status', [EmployeeController::class, 'toggleStatus']);
     });
+});
+
+// ============================================
+// TEST ENDPOINTS
+// ============================================
+Route::get('/server-info', function() {
+    return response()->json([
+        'server_port' => request()->server('SERVER_PORT'),
+        'server_addr' => request()->server('SERVER_ADDR'),
+        'remote_addr' => request()->ip(),
+        'time' => now()->toDateTimeString(),
+        'random' => rand(1000, 9999),
+    ]);
 });

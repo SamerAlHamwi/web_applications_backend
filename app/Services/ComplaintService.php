@@ -48,10 +48,7 @@ class ComplaintService
                 'complaint_kind' => $data['complaint_kind'],
                 'description' => $data['description'],
                 'location' => $data['location'],
-                'latitude' => $data['latitude'] ?? null,
-                'longitude' => $data['longitude'] ?? null,
                 'status' => 'new',
-                'priority' => $data['priority'] ?? 'medium',
                 'version' => 1,
             ]);
 
@@ -78,7 +75,6 @@ class ComplaintService
             throw $e;
         }
     }
-
     /**
      * Update complaint (only for 'new' or 'declined' status)
      */
@@ -87,14 +83,12 @@ class ComplaintService
         DB::beginTransaction();
 
         try {
-            // Check if user owns the complaint
             if ($user->role === 'citizen' && $complaint->user_id !== $user->id) {
                 throw ValidationException::withMessages([
                     'complaint' => ['You can only update your own complaints.']
                 ]);
             }
 
-            // Check if complaint can be updated based on status
             $state = $complaint->getState();
 
             if (!$state->canBeUpdatedByCitizen($complaint)) {
@@ -132,18 +126,12 @@ class ComplaintService
             if (isset($data['location'])) {
                 $updateData['location'] = $data['location'];
             }
-            if (isset($data['latitude'])) {
-                $updateData['latitude'] = $data['latitude'];
-            }
-            if (isset($data['longitude'])) {
-                $updateData['longitude'] = $data['longitude'];
-            }
 
             // If updating a declined complaint, change status back to 'new'
             if ($complaint->status === 'declined') {
                 $oldStatus = $complaint->status;
                 $updateData['status'] = 'new';
-                $updateData['assigned_to'] = null; // Clear assignment
+                $updateData['assigned_to'] = null;
                 $updateData['locked_at'] = null;
                 $updateData['lock_expires_at'] = null;
             }
@@ -153,7 +141,6 @@ class ComplaintService
                 $complaint->clearInfoRequest();
             }
 
-            // Increment version for optimistic locking
             $complaint->incrementVersion();
             $this->complaintRepository->update($complaint, $updateData);
 

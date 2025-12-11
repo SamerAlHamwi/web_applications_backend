@@ -15,16 +15,18 @@ class VerifyEmailRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email', 'exists:users,email'],
-            'code' => ['required', 'string', 'size:6', 'regex:/^[0-9]{6}$/'],
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'size:6'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'code.size' => 'Verification code must be exactly 6 digits.',
-            'code.regex' => 'Verification code must contain only numbers.',
+            'email.required' => 'Email address is required',
+            'email.email' => 'Please provide a valid email address',
+            'code.required' => 'Verification code is required',
+            'code.size' => 'Verification code must be exactly 6 digits',
         ];
     }
 }

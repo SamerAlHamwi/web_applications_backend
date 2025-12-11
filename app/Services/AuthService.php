@@ -4,13 +4,14 @@
 namespace App\Services;
 
 use App\Models\User;
-use App\Models\EmailVerification;
+use App\Models\PendingRegistration;
 use App\Repositories\UserRepository;
 use App\Repositories\RefreshTokenRepository;
-use App\Repositories\EmailVerificationRepository;
+use App\Repositories\PendingRegistrationRepository;
 use App\Mail\VerifyEmailMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -21,129 +22,158 @@ class AuthService
     public function __construct(
         private UserRepository $userRepository,
         private RefreshTokenRepository $refreshTokenRepository,
-        private EmailVerificationRepository $emailVerificationRepository
+        private PendingRegistrationRepository $pendingRegistrationRepository
     ) {}
 
     /**
-     * Register a new user and send verification code
+     * Register a new user (stores temporarily until email verified)
+     * User is NOT created in users table until they verify their email
      */
     public function register(array $data): array
     {
+        // Check if email already exists in users table
         if ($this->userRepository->emailExists($data['email'])) {
             throw ValidationException::withMessages([
-                'email' => ['This email is already registered.']
+                'email' => ['This email is already registered and verified.']
             ]);
         }
 
-        $data['password'] = Hash::make($data['password']);
-        unset($data['password_confirmation']);
-        $data['role'] = $data['role'] ?? 'citizen';
+        // Check if there's already a pending registration
+        $existing = $this->pendingRegistrationRepository->findByEmail($data['email']);
+        if ($existing && !$existing->isExpired()) {
+            throw ValidationException::withMessages([
+                'email' => ['A verification code has already been sent to this email. Please check your inbox or request a resend.']
+            ]);
+        }
 
-        // Create user (email_verified_at will be null)
-        $user = $this->userRepository->create($data);
+        try {
+            // Delete any old pending registrations for this email
+            $this->pendingRegistrationRepository->deleteByEmail($data['email']);
 
-        // Generate and send verification code
-        $this->sendVerificationCode($user);
+            // Create pending registration with verification code
+            $pendingRegistration = $this->pendingRegistrationRepository->create([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => $data['role'] ?? 'citizen',
+                'code' => PendingRegistration::generateCode(),
+                'expires_at' => Carbon::now()->addMinutes(
+                    config('auth.verification.expire', 60)
+                ),
+            ]);
 
-        return [
-            'user' => $this->formatUserData($user),
-            'message' => 'Registration successful! A 6-digit verification code has been sent to your email.',
-        ];
+            // Send verification email
+            Mail::to($pendingRegistration->email)->send(
+                new VerifyEmailMail($pendingRegistration)
+            );
+
+            return [
+                'email' => $pendingRegistration->email,
+                'message' => 'Registration initiated! A 6-digit verification code has been sent to your email. Please verify to complete registration.',
+            ];
+
+        } catch (\Exception $e) {
+            // Clean up if email fails
+            if (isset($pendingRegistration)) {
+                $pendingRegistration->delete();
+            }
+            throw new \Exception('Registration failed: ' . $e->getMessage());
+        }
     }
 
     /**
-     * Send verification code to user's email
+     * Verify email and CREATE the user account
+     * This is when the user is actually created in the database
      */
-    public function sendVerificationCode(User $user): EmailVerification
+    public function verifyEmail(string $email, string $code): array
     {
-        // Delete old unused codes for this user
-        $this->emailVerificationRepository->deleteOldCodesForUser($user->id);
+        // Find pending registration
+        $pendingRegistration = $this->pendingRegistrationRepository->findByEmailAndCode($email, $code);
 
-        // Generate new verification code
-        $code = EmailVerification::generateCode();
-
-        // Store verification code
-        $verification = $this->emailVerificationRepository->create([
-            'user_id' => $user->id,
-            'code' => $code,
-            'expires_at' => Carbon::now()->addMinutes(
-                config('auth.verification.expire', 60)
-            ),
-        ]);
-
-        // Send email
-        Mail::to($user->email)->send(new VerifyEmailMail($user, $verification));
-
-        return $verification;
-    }
-
-    /**
-     * Verify email with code
-     */
-    public function verifyEmail(int $userId, string $code): array
-    {
-        // Find user
-        $user = $this->userRepository->findById($userId);
-
-        if (!$user) {
-            throw ValidationException::withMessages([
-                'user' => ['User not found.']
-            ]);
-        }
-
-        // Check if already verified
-        if ($user->hasVerifiedEmail()) {
-            throw ValidationException::withMessages([
-                'email' => ['Email is already verified.']
-            ]);
-        }
-
-        // Find verification code
-        $verification = $this->emailVerificationRepository->findByUserAndCode($userId, $code);
-
-        if (!$verification) {
+        if (!$pendingRegistration) {
             throw ValidationException::withMessages([
                 'code' => ['Invalid or expired verification code.']
             ]);
         }
 
-        // Mark code as used
-        $this->emailVerificationRepository->markAsUsed($verification);
+        try {
+            return DB::transaction(function () use ($pendingRegistration) {
+                // NOW create the actual user with email already verified
+                $user = $this->userRepository->create([
+                    'first_name' => $pendingRegistration->first_name,
+                    'last_name' => $pendingRegistration->last_name,
+                    'email' => $pendingRegistration->email,
+                    'password' => $pendingRegistration->password, // Already hashed
+                    'role' => $pendingRegistration->role,
+                    'email_verified_at' => Carbon::now(), // Mark as verified immediately
+                ]);
 
-        // Mark email as verified
-        $user->markEmailAsVerified();
+                // Delete the pending registration
+                $pendingRegistration->delete();
 
-        // Generate tokens now that user is verified
-        $tokens = $this->generateTokensForUser($user);
+                // Generate tokens
+                $tokens = $this->generateTokensForUser($user);
 
-        return [
-            'message' => 'Email verified successfully!',
-            'user' => $this->formatUserData($user),
-            'tokens' => $tokens,
-        ];
+                return [
+                    'message' => 'Email verified successfully! Your account has been created.',
+                    'user' => $this->formatUserData($user),
+                    'tokens' => $tokens,
+                ];
+            });
+
+        } catch (\Exception $e) {
+            throw new \Exception('Verification failed: ' . $e->getMessage());
+        }
     }
 
     /**
      * Resend verification code
      */
-    public function resendVerificationCode(User $user): void
+    public function resendVerificationCode(string $email): void
     {
-        if ($user->hasVerifiedEmail()) {
+        // Check if user already exists and is verified
+        $existingUser = $this->userRepository->findByEmail($email);
+        if ($existingUser && $existingUser->hasVerifiedEmail()) {
             throw ValidationException::withMessages([
-                'email' => ['Email is already verified.']
+                'email' => ['This email is already verified. Please login.']
             ]);
         }
 
-        // Check rate limiting (prevent spam)
-        $recentCodesCount = $this->emailVerificationRepository->countUnusedCodesForUser($user->id);
+        // Find pending registration
+        $pendingRegistration = $this->pendingRegistrationRepository->findByEmail($email);
 
-        if ($recentCodesCount >= 3) {
+        if (!$pendingRegistration) {
             throw ValidationException::withMessages([
-                'code' => ['Too many verification attempts. Please try again later.']
+                'email' => ['No pending registration found for this email. Please register first.']
             ]);
         }
 
-        $this->sendVerificationCode($user);
+        // Check rate limiting
+        $recentCount = $this->pendingRegistrationRepository->countByEmail($email);
+        if ($recentCount >= 3) {
+            throw ValidationException::withMessages([
+                'email' => ['Too many verification attempts. Please try again later.']
+            ]);
+        }
+
+        try {
+            // Generate new code and update expiration
+            $pendingRegistration->update([
+                'code' => PendingRegistration::generateCode(),
+                'expires_at' => Carbon::now()->addMinutes(
+                    config('auth.verification.expire', 60)
+                ),
+            ]);
+
+            // Resend email
+            Mail::to($pendingRegistration->email)->send(
+                new VerifyEmailMail($pendingRegistration)
+            );
+
+        } catch (\Exception $e) {
+            throw new \Exception('Failed to resend verification code: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -153,19 +183,27 @@ class AuthService
     {
         $user = $this->userRepository->findByEmail($credentials['email']);
 
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+        if (!$user) {
+            // Check if there's a pending registration
+            $pending = $this->pendingRegistrationRepository->findByEmail($credentials['email']);
+            if ($pending) {
+                throw ValidationException::withMessages([
+                    'email' => ['Please verify your email first. Check your inbox for the verification code.']
+                ]);
+            }
+
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.']
             ]);
         }
 
-        // Check if email is verified (optional - uncomment to enforce)
-        // if (!$user->hasVerifiedEmail()) {
-        //     throw ValidationException::withMessages([
-        //         'email' => ['Please verify your email address first.']
-        //     ]);
-        // }
+        if (!Hash::check($credentials['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.']
+            ]);
+        }
 
+        // User exists and is verified (because they can only be created after verification)
         $tokens = $this->generateTokensForUser($user);
 
         return [

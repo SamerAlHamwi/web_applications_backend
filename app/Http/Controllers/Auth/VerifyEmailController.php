@@ -4,36 +4,33 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Auth\VerifyEmailRequest;
 use App\Services\AuthService;
-use App\Repositories\UserRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class VerifyEmailController extends Controller
 {
     public function __construct(
-        private AuthService $authService,
-        private UserRepository $userRepository
+        private AuthService $authService
     ) {}
 
     /**
      * Verify email with 6-digit code
+     * This creates the user account
      */
-    public function verify(VerifyEmailRequest $request): JsonResponse
+    public function verify(Request $request): JsonResponse
     {
         try {
-            // Find user by email
-            $user = $this->userRepository->findByEmail($request->email);
+            $request->validate([
+                'email' => ['required', 'email'],
+                'code' => ['required', 'string', 'size:6'],
+            ]);
 
-            if (!$user) {
-                return response()->json([
-                    'message' => 'User not found'
-                ], 404);
-            }
-
-            // Verify the code
-            $result = $this->authService->verifyEmail($user->id, $request->code);
+            $result = $this->authService->verifyEmail(
+                $request->email,
+                $request->code
+            );
 
             return response()->json([
                 'message' => $result['message'],
@@ -43,9 +40,15 @@ class VerifyEmailController extends Controller
                 ]
             ], 200);
 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Verification failed',
+                'errors' => $e->errors()
+            ], 422);
+
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Email verification failed',
+                'message' => 'Verification failed',
                 'error' => $e->getMessage()
             ], 400);
         }
@@ -58,22 +61,20 @@ class VerifyEmailController extends Controller
     {
         try {
             $request->validate([
-                'email' => ['required', 'email', 'exists:users,email']
+                'email' => ['required', 'email']
             ]);
 
-            $user = $this->userRepository->findByEmail($request->email);
-
-            if (!$user) {
-                return response()->json([
-                    'message' => 'User not found'
-                ], 404);
-            }
-
-            $this->authService->resendVerificationCode($user);
+            $this->authService->resendVerificationCode($request->email);
 
             return response()->json([
                 'message' => 'Verification code sent successfully'
             ], 200);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Failed to resend verification code',
+                'errors' => $e->errors()
+            ], 422);
 
         } catch (\Exception $e) {
             return response()->json([
