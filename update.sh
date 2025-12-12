@@ -4,7 +4,6 @@
 PROJECT_DIR="/var/www/web_application_admin"
 GIT_REPO="https://github.com/SamerAlHamwi/web_applications_backend"
 GIT_BRANCH="main"
-DB_FILE="$PROJECT_DIR/database/database.sqlite"
 
 echo "🔄 Starting update for web_application_admin..."
 
@@ -33,7 +32,6 @@ COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --opt
 
 # Laravel commands
 echo "🔧 Running Laravel optimizations..."
-
 php artisan config:clear
 php artisan cache:clear
 php artisan config:cache
