@@ -31,15 +31,6 @@ git clean -fd
 echo "📦 Installing dependencies..."
 COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --optimize-autoloader
 
-# ====== Create SQLite DB file if missing ======
-if [ ! -f "$DB_FILE" ]; then
-  echo "🗂 Creating SQLite database file..."
-  touch "$DB_FILE" || { echo "❌ Failed to create SQLite DB file."; exit 1; }
-  chmod 664 "$DB_FILE"
-else
-  echo "✅ SQLite database file already exists."
-fi
-
 # Laravel commands
 echo "🔧 Running Laravel optimizations..."
 
