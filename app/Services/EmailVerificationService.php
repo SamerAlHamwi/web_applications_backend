@@ -36,7 +36,7 @@ class EmailVerificationService
         ]);
 
         // Send verification email
-        Mail::to($user->email)->send(new VerifyEmailMail($user, $verification));
+        //Mail::to($user->email)->send(new VerifyEmailMail($user, $verification));
 
         return $verification;
     }
