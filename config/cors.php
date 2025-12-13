@@ -12,6 +12,7 @@ return [
         'http://localhost:8080',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:8080',
+        'http://localhost:54607', // Flutter web default port
         'https://web.autotap.site', // Production domain
         // Add your Flutter web development URL
         // Add your production domain when deploying
