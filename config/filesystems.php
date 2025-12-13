@@ -24,8 +24,9 @@ return [
         // ✅ NEW: Shared disk for load balancing
         'shared' => [
             'driver' => 'local',
+            'root' => storage_path('app/public'),
             // Use absolute path that all instances can access
-            'root' => 'C:/wamp64/www/internet-programs/storage/app/public',
+            //'root' => 'C:/wamp64/www/internet-programs/storage/app/public',
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
             'throw' => false,
