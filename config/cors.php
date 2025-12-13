@@ -18,7 +18,7 @@ return [
     ],
 
     'allowed_origins_patterns' => [
-        '^http://localhost:\d+$', // Allow any port on localhost for development
+        '^http://localhost(:\d+)?$', // Allow localhost with or without port for development
     ],
 
     'allowed_headers' => ['*'],
