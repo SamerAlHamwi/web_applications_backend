@@ -96,7 +96,16 @@ class User extends Authenticatable implements JWTSubject
     }
 
     /**
-     * Complaints assigned to this employee
+     * Complaints filed by this user (for citizens)
+     * ✅ NEW - Required for admin API to get citizen's complaints
+     */
+    public function complaints(): HasMany
+    {
+        return $this->hasMany(Complaint::class, 'user_id');
+    }
+
+    /**
+     * Complaints assigned to this employee (for employees)
      */
     public function assignedComplaints(): HasMany
     {
@@ -174,6 +183,7 @@ class User extends Authenticatable implements JWTSubject
     {
         return $query->where('is_active', true);
     }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()

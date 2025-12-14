@@ -78,4 +78,39 @@ class ComplaintRepository
     {
         return $complaint->delete();
     }
+    public function getComplaintsByCitizenId(int $citizenId, int $perPage = 15): LengthAwarePaginator
+    {
+        return Complaint::with(['entity', 'attachments', 'assignedEmployee'])
+            ->where('user_id', $citizenId)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get complaints by entity ID (for admin)
+     */
+    public function getComplaintsByEntityId(int $entityId, int $perPage = 15): LengthAwarePaginator
+    {
+        return Complaint::with(['user', 'attachments', 'assignedEmployee'])
+            ->where('entity_id', $entityId)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get statistics for entity
+     */
+    public function getEntityStatistics(int $entityId): array
+    {
+        $complaints = Complaint::where('entity_id', $entityId);
+
+        return [
+            'total' => $complaints->count(),
+            'new' => $complaints->clone()->where('status', 'new')->count(),
+            'in_progress' => $complaints->clone()->where('status', 'in_progress')->count(),
+            'finished' => $complaints->clone()->where('status', 'finished')->count(),
+            'declined' => $complaints->clone()->where('status', 'declined')->count(),
+        ];
+    }
+
 }

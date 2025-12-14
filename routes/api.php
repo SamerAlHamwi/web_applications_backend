@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\CitizenController;
 use App\Http\Controllers\Admin\EmployeeController;
 use App\Http\Controllers\Admin\RateLimitController;
 use App\Http\Controllers\Admin\StatisticsController;
@@ -138,6 +139,11 @@ Route::prefix('admin/auth')->group(function () {
 
 // Protected admin routes
 Route::prefix('admin')->middleware(['auth:api', 'admin', 'throttle:admin-api'])->group(function () {
+    Route::prefix('citizens')->group(function () {
+        Route::get('/', [CitizenController::class, 'index']); // Get all citizens
+        Route::get('/{id}', [CitizenController::class, 'show']); // Get single citizen
+        Route::get('/{id}/complaints', [CitizenController::class, 'complaints']); // Get citizen's complaints
+    });
 
     // Admin Auth
     Route::post('/auth/logout', [AdminAuthController::class, 'logout']);
@@ -179,6 +185,7 @@ Route::prefix('admin')->middleware(['auth:api', 'admin', 'throttle:admin-api'])-
         Route::delete('/{id}', [EntityController::class, 'destroy']);
         Route::patch('/{id}/toggle-status', [EntityController::class, 'toggleStatus']);
         Route::get('/{entityId}/employees', [EmployeeController::class, 'getByEntity']);
+        Route::get('/{entityId}/complaints', [EntityController::class, 'getComplaints']);
     });
 
     // Employee Management

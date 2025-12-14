@@ -4,6 +4,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Complaint;
+use App\Models\Entity;
 use App\Services\EntityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -203,5 +205,80 @@ class EntityController extends Controller
                 'error' => $e->getMessage()
             ], 422);
         }
+    }
+    public function complaints(Request $request, int $id): JsonResponse
+    {
+        // Verify entity exists
+        $entity = $this->entityService->getEntityById($id);
+
+        if (!$entity) {
+            return response()->json([
+                'message' => 'Entity not found'
+            ], 404);
+        }
+
+        $perPage = $request->query('per_page', 15);
+
+        // Inject ComplaintRepository in constructor first
+        $complaints = app(ComplaintRepository::class)
+            ->getComplaintsByEntityId($id, $perPage);
+
+        // Get statistics
+        $statistics = app(ComplaintRepository::class)
+            ->getEntityStatistics($id);
+
+        return response()->json([
+            'data' => $complaints->map(fn($complaint) => [
+                'id' => $complaint->id,
+                'tracking_number' => $complaint->tracking_number,
+                'complaint_kind' => $complaint->complaint_kind,
+                'description' => $complaint->description,
+                'location' => $complaint->location,
+                'status' => $complaint->status,
+                'priority' => $complaint->priority,
+                'info_requested' => $complaint->info_requested,
+                'is_locked' => $complaint->isLocked(),
+                'citizen' => [
+                    'id' => $complaint->user->id,
+                    'name' => $complaint->user->full_name,
+                    'email' => $complaint->user->email,
+                ],
+                'assigned_employee' => $complaint->assignedEmployee ? [
+                    'id' => $complaint->assignedEmployee->id,
+                    'name' => $complaint->assignedEmployee->full_name,
+                ] : null,
+                'attachments_count' => $complaint->attachments->count(),
+                'created_at' => $complaint->created_at,
+                'updated_at' => $complaint->updated_at,
+                'resolved_at' => $complaint->resolved_at,
+            ]),
+            'meta' => [
+                'current_page' => $complaints->currentPage(),
+                'last_page' => $complaints->lastPage(),
+                'per_page' => $complaints->perPage(),
+                'total' => $complaints->total(),
+            ],
+            'entity' => [
+                'id' => $entity->id,
+                'name' => $entity->name,
+                'name_ar' => $entity->name_ar,
+                'type' => $entity->type,
+            ],
+            'statistics' => $statistics,
+        ], 200);
+    }
+    public function getComplaints($entityId)
+    {
+        $entity = Entity::findOrFail($entityId);
+
+        $complaints = Complaint::where('entity_id', $entityId)
+            ->with(['user', 'attachments'])  // Changed from 'citizen' to 'user'
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
+        return response()->json([
+            'entity' => $entity,
+            'complaints' => $complaints
+        ]);
     }
 }
