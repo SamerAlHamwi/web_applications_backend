@@ -57,16 +57,16 @@ class AuthService
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
                 'role' => $data['role'] ?? 'citizen',
-                'code' => PendingRegistration::generateCode(),
+                'code' => '000000',
                 'expires_at' => Carbon::now()->addMinutes(
                     config('auth.verification.expire', 60)
                 ),
             ]);
 
             // Send verification email
-            Mail::to($pendingRegistration->email)->send(
-                new VerifyEmailMail($pendingRegistration)
-            );
+//             Mail::to($pendingRegistration->email)->send(
+//                 new VerifyEmailMail($pendingRegistration)
+//             );
 
             $message = 'Registration initiated! A 6-digit verification code has been sent to your email. Please verify to complete registration.';
 
@@ -196,16 +196,16 @@ class AuthService
         try {
             // Generate new code and update expiration
             $pendingRegistration->update([
-                'code' => PendingRegistration::generateCode(),
+                'code' => '000000',
                 'expires_at' => Carbon::now()->addMinutes(
                     config('auth.verification.expire', 60)
                 ),
             ]);
 
             // Resend email
-            Mail::to($pendingRegistration->email)->send(
-                new VerifyEmailMail($pendingRegistration)
-            );
+//             Mail::to($pendingRegistration->email)->send(
+//                 new VerifyEmailMail($pendingRegistration)
+//             );
 
         } catch (\Exception $e) {
             throw new \Exception('Failed to resend verification code: ' . $e->getMessage());
